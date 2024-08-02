@@ -1,26 +1,33 @@
-class UserNotification(Notification):
-    def __init__(self):
-        pass
-        # name;
-        # text;
-        # level; info, warning, critical ...
-        # type; balanceN, successN...
-        # is_ blur; по умолчанию None
-        # is_inline; по умолчанию None
-        # state;
+import asyncio
+from main import send_notification_to_users
+from NotificationState import NotificationState
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-    def __send(self):
-        pass
-    # отправка(tg_send)
 
-    @property
-    def send(self):
-        pass
-    # __send()
+class UserNotification:
+    def __init__(self, name, text, level, type_, is_blur=None, is_inline=None):
+        self.name = name
+        self.text = text
+        self.level = level
+        self.type = type_
+        self.is_blur = is_blur
+        self.is_inline = is_inline
+        self.state = NotificationState.NEW
+
+    async def __send(self):
+        print("hehe")
+        await send_notification_to_users(self.name, self.text, self.level)
+
+    async def send(self):
+        # Call __send with appropriate reply_markup
+        await self.__send()
 
     def preparing(self):
-        pass
-        # есть blur, inline?
+        if self.is_blur or self.is_inline:
+            self.state = NotificationState.PREPARING_TO_SEND
 
-    def feedback(self) -> feedbackEnum:
+    def feedback(self):
+        # Implementation for feedback
         pass
+
+
