@@ -38,6 +38,6 @@ class NotificationTable(Model):
 
 def initialize_db():
     db.connect()
-    db.create_tables([UsersTable, NotificaionTable], safe=True)  # Create tables if they don't exist
+    db.create_tables([UsersTable, NotificationTable], safe=True)  # Create tables if they don't exist
 
 initialize_db()

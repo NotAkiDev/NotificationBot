@@ -4,10 +4,11 @@ import asyncio
 from config_reader import config
 from TgUser import TgUser
 from StateMachine import State
-from dbServing import UsersTable
+from dbServing import UsersTable, NotificationTable
 from FeedbackState import FeedbackState
 import UserNotification
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 import random
 
 bot = Bot(token=config.bot_token.get_secret_value())
@@ -105,17 +106,20 @@ async def code_handler(message: types.Message):
         await message.answer("You are not registered.")
 
 
-@dp.callback_query(lambda callback_query: callback_query.data == "read")
+@dp.callback_query(lambda callback_query: callback_query.data.startswith("read_"))
 async def handle_read_button(callback_query: types.CallbackQuery):
-    user_id = callback_query.from_user.id
-    # Обновить состояние в базе данных
+    # Извлекаем ID уведомления из callback_data
+    notification_id = int(callback_query.data.split("_")[1])
+
+    # Обновляем состояние в базе данных только для конкретного уведомления
     NotificationTable.update(
         {
             NotificationTable.feedback: FeedbackState.CONFIRM
         }
-    ).where(NotificationTable.uid == user_id).execute()
+    ).where(NotificationTable.id == notification_id).execute()
+
     await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(user_id, "You have acknowledged the notification.")
+    await bot.send_message(callback_query.from_user.id, "You have acknowledged the notification.")
 
 
 async def send_notification_to_users(name, notification_text, level):
@@ -129,17 +133,18 @@ async def send_notification_to_users(name, notification_text, level):
                 level=level
             )
             if level == "critical":
-                inline_kb = InlineKeyboardMarkup().add(InlineKeyboardButton("I've read", callback_data="read"))
-                await bot.send_message(user_id, notification_text, reply_markup=inline_kb)
+                builder = InlineKeyboardBuilder()
+                builder.add((InlineKeyboardButton(text="I've read", callback_data=f"read_{notification.id}")))
+                await bot.send_message(user_id, notification_text, reply_markup=builder.as_markup())
             else:
                 await bot.send_message(user_id, notification_text)
 
 
-@dp.message(Command("sas"))
+@dp.message(Command("gen"))
 async def mew(message: types.Message):
     notification_levels = ["info", "warning", "critical"]
     name = f"Notification_{random.randint(1, 1000)}"
-    text = f"This is a {random.choice(['test', 'sample', 'example'])} notification with ID {random.randint(1, 1000)}."
+    text = f"This is a {random.choice(['test', 'sample', 'example'])} notification with ID {random.randint(10000, 99999)}."
     level = random.choice(notification_levels)
     notification = UserNotification.UserNotification(name, text, level, type_=None)
     print("here")
