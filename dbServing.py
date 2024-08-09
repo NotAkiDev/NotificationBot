@@ -10,7 +10,7 @@ db = PostgresqlDatabase(
     port=config.port.get_secret_value()
 )
 
-
+# UsersTable
 class UsersTable(Model):
     id = CharField()
     uid = CharField(unique=True)  # Ensure UID is unique
@@ -24,8 +24,8 @@ class UsersTable(Model):
         database = db  # Define the database to use for this model
 
 
-# Connect to the database and create the UsersTable if it doesn't exist
 
+# NotificationTable
 class NotificationTable(Model):
     uid = CharField()
     note_name = CharField()
@@ -35,7 +35,7 @@ class NotificationTable(Model):
     class Meta:
         database = db
 
-
+# Connect to the database and create the UsersTable/NotificationTable if it doesn't exist
 def initialize_db():
     db.connect()
     db.create_tables([UsersTable, NotificationTable], safe=True)  # Create tables if they don't exist

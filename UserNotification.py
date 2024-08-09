@@ -15,7 +15,6 @@ class UserNotification:
         self.state = NotificationState.NEW
 
     async def __send(self):
-        print("hehe")
         await send_notification_to_users(self.name, self.text, self.level)
 
     async def send(self):

@@ -13,6 +13,7 @@ class TgUser:
         self.confirm_code = confirm_code
         self.is_attached = is_attached
 
+    # For the activation process. Writing user information to the database and adding the activation code
     def activate(self):
         print(f"Activating user with ID: {self.uid}")
         self.__send_activate_code()
@@ -33,6 +34,7 @@ class TgUser:
                 }
             ).where(UsersTable.uid == self.uid).execute()
 
+    # For the deactivation process. Writing the activation code
     def deactivate(self):
         self.__send_deactivate_code()
         UsersTable.update(
@@ -41,8 +43,9 @@ class TgUser:
             }
         ).where(UsersTable.uid == self.uid).execute()
 
+    # There should be a status return to the api here.
     def __is_valid_code(self, taken_code):
-        print("Validating activation code...")
+        print("Validating")
         # api return
         return taken_code == self.confirm_code
 
