@@ -5,8 +5,8 @@ from dbServing import UsersTable
 
 
 class TgUser:
-    def __init__(self, uid, name, surname, username, confirm_code=None, is_attached=False):
-        self.uid = uid
+    def __init__(self, tg_id, name, surname, username, confirm_code=None, is_attached=False):
+        self.tg_id = tg_id
         self.name = name
         self.surname = surname
         self.username = username
@@ -15,12 +15,12 @@ class TgUser:
 
     # For the activation process. Writing user information to the database and adding the activation code
     def activate(self):
-        print(f"Activating user with ID: {self.uid}")
+        print(f"Activating user with ID: {self.tg_id}")
         self.__send_activate_code()
-        user_query = UsersTable.select().where(UsersTable.uid == self.uid)
+        user_query = UsersTable.select().where(UsersTable.tg_id == self.tg_id)
         if not user_query.exists():
             UsersTable.create(
-                uid=self.uid,
+                tg_id=self.tg_id,
                 name=self.name,
                 surname=self.surname,
                 username=self.username,
@@ -32,7 +32,7 @@ class TgUser:
                 {
                     UsersTable.confirm_code: self.confirm_code,
                 }
-            ).where(UsersTable.uid == self.uid).execute()
+            ).where(UsersTable.tg_id == self.tg_id).execute()
 
     # For the deactivation process. Writing the activation code
     def deactivate(self):
@@ -41,7 +41,7 @@ class TgUser:
             {
                 UsersTable.confirm_code: self.confirm_code,
             }
-        ).where(UsersTable.uid == self.uid).execute()
+        ).where(UsersTable.tg_id == self.tg_id).execute()
 
     # There should be a status return to the api here.
     def __is_valid_code(self, taken_code):
@@ -58,7 +58,7 @@ class TgUser:
                     UsersTable.is_attached: self.is_attached,
                     UsersTable.confirm_code: None,
                 }
-            ).where(UsersTable.uid == self.uid).execute()
+            ).where(UsersTable.tg_id == self.tg_id).execute()
             print("Account activated successfully")
             return True
         return False
@@ -72,7 +72,7 @@ class TgUser:
                     UsersTable.is_attached: self.is_attached,
                     UsersTable.confirm_code: None,
                 }
-            ).where(UsersTable.uid == self.uid).execute()
+            ).where(UsersTable.tg_id == self.tg_id).execute()
             print("Account deactivated successfully")
             return True
         return False
