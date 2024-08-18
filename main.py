@@ -1,70 +1,59 @@
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.enums import ParseMode
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 import asyncio
 from typing import Callable, Dict, Any, Awaitable
-from aiogram import Router, BaseMiddleware
+from aiogram import BaseMiddleware
 from config_reader import config
 from TgUser import TgUser
 from StateMachine import State
 from dbServing import UsersTable, NotificationTable
 from FeedbackState import FeedbackState
 import UserNotification
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, TelegramObject, message, CallbackQuery
+from aiogram.types import InlineKeyboardButton, TelegramObject
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import random
 
 bot = Bot(token=config.bot_token.get_secret_value())
 dp = Dispatcher()
-users = {}
-
-
-class InnerCallbackQueryUniqueClientMiddleware(BaseMiddleware):
-    async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: types.Message,
-            data: Dict[str, Any]) -> Any:
-        user_data = UsersTable.get_or_none(UsersTable.tg_id == event.from_user.id)
-        if user_data:
-            tg_user = TgUser(
-                tg_id=user_data.tg_id,
-                name=user_data.name,
-                surname=user_data.surname,
-                username=user_data.username,
-                confirm_code=user_data.confirm_code,
-                is_attached=user_data.is_attached
-            )
-            data["tg_user"] = tg_user
-        return await handler(event, data)
-
-
-dp.message.middleware(InnerCallbackQueryUniqueClientMiddleware())
 
 
 async def load_users_from_db():
-    global users
     query = UsersTable.select()
     users = {}
     for user in query:
-        users[int(user.tg_id)] = [TgUser(
+        users[int(user.tg_id)] = TgUser(
             tg_id=user.tg_id,
             name=user.name,
             surname=user.surname,
             username=user.username,
             confirm_code=user.confirm_code,
-            is_attached=user.is_attached
-        ), State.WAIT_NOTIFICATION if user.is_attached else State.START]
+            is_attached=user.is_attached)
     return users
 
 
-@dp.message(StateFilter(None), Command("start"))
-async def handler_start(message: types.Message, state: FSMContext):
-    global users
-    if message.from_user.id not in users:
-        users[message.from_user.id] = [None, State.START]
+class InnerCallbackQueryUniqueClientMiddleware(BaseMiddleware):
+    def __init__(self):
+        self.users = None
 
-    if users[message.from_user.id][1] == State.START:
+    async def __call__(self, handler, event: types.Message, data):
+        await self.load()
+        data["tg_user"] = self.users
+        return await handler(event, data)
+
+    async def load(self):
+        self.users = await load_users_from_db()
+
+
+@dp.message(StateFilter(None), Command("start"))
+async def handler_start(message: types.Message, state: FSMContext, tg_user: Any):
+    print(tg_user)
+    if message.from_user.id not in tg_user:
+        tg_user[message.from_user.id] = None
+        UsersTable.create(tg_id=message.from_user.id, name=message.from_user.first_name,
+                          surname=message.from_user.last_name, username=message.from_user.username)
+
         kb = [
             [types.KeyboardButton(text="Connect Account")],
             [types.KeyboardButton(text="Deactivate Account")]
@@ -72,21 +61,18 @@ async def handler_start(message: types.Message, state: FSMContext):
         keyboard = types.ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, input_field_placeholder="Choose action")
         await message.answer("Welcome! What would you like to do?", reply_markup=keyboard)
         await state.set_state(State.START)
+    else:
+        await message.answer("You're already registered")
 
 
-@dp.message(StateFilter(State.START), F.text == "Connect Account")
-async def handler_button_activate(message: types.Message, state: FSMContext, data: Dict[Any, int]):
-    global users
+@dp.message(StateFilter(None, State.START), F.text == "Connect Account")
+async def handler_button_activate(message: types.Message, state: FSMContext, tg_user):
     user_id = message.from_user.id
-    if user_id in users:
-        users[user_id][0] = TgUser(
-            user_id,
-            message.from_user.first_name,
-            message.from_user.last_name,
-            message.from_user.username
-        )
-        users[user_id][0].activate()
-        users[user_id][1] = State.ON_VALIDATION
+    print("HERE")
+    if user_id in tg_user.keys():
+        print(tg_user[user_id])
+        print("HEHERE")
+        tg_user[user_id].activate()
         await message.answer("Enter the activation code:")
         await state.set_state(State.ON_VALIDATION)
     else:
@@ -94,34 +80,28 @@ async def handler_button_activate(message: types.Message, state: FSMContext, dat
 
 
 @dp.message(StateFilter(State.WAIT_NOTIFICATION), F.text == "Deactivate Account")
-async def handler_button_deactivate(message: types.Message, state: FSMContext):
-    user = users.get(message.from_user.id)
+async def handler_button_deactivate(message: types.Message, state: FSMContext, tg_user):
+    user = tg_user.get(message.from_user.id)
     if user:
-        users[message.from_user.id][0].deactivate()
-        users[message.from_user.id][1] = State.GET_CODE
+        tg_user[message.from_user.id].deactivate()
         await message.answer("Enter the deactivation code:")
         await state.set_state(State.GET_CODE)
-    else:
-        await message.answer("You are not registered.")
 
 
 @dp.message(StateFilter(State.ON_VALIDATION, State.GET_CODE), lambda message: len(message.text) == 8)
-async def code_handler(message: types.Message, state: FSMContext):
-    global users
-    user = users.get(message.from_user.id)
+async def code_handler(message: types.Message, state: FSMContext, tg_user):
+    user = tg_user.get(message.from_user.id)
     if user:
         current_state = await state.get_state()
         if current_state == State.ON_VALIDATION:
-            if users[message.from_user.id][0].confirm_activate(message.text):
-                users[message.from_user.id][1] = State.WAIT_NOTIFICATION
+            if tg_user[message.from_user.id].confirm_activate(message.text):
                 await message.answer("Activation code accepted. Account activated.")
                 await state.set_state(State.WAIT_NOTIFICATION)
             else:
                 await message.answer("Invalid activation code.")
                 await state.set_state(State.START)
         elif current_state == State.GET_CODE:
-            if users[message.from_user.id][0].confirm_deactivate(message.text):
-                users[message.from_user.id][1] = State.DEACTIVATE_PROCESS_CLOSE
+            if tg_user[message.from_user.id].confirm_deactivate(message.text):
                 await message.answer("Deactivation code accepted. Account deactivated.")
                 await state.set_state(State.START)
             else:
@@ -142,38 +122,41 @@ async def handle_read_button(callback_query: types.CallbackQuery):
     await bot.send_message(callback_query.from_user.id, "You have acknowledged the notification.")
 
 
-async def send_notification_to_users(name, notification_text, level):
-    global users
-    users = await load_users_from_db()
-    for user_id, (user, state) in users.items():
-        if state == State.WAIT_NOTIFICATION:
-            notification = NotificationTable.create(
-                uid=user_id,
-                note_name=name,
-                level=level
-            )
-            if level == "critical":
-                builder = InlineKeyboardBuilder()
-                builder.add(InlineKeyboardButton(text="I've read", callback_data=f"read_{notification.id}"))
-                await bot.send_message(user_id, notification_text, reply_markup=builder.as_markup())
-            else:
-                await bot.send_message(user_id, notification_text)
+async def send_notification_to_users(name, notification_text, level, is_inline):
+    query = UsersTable.select(UsersTable.tg_id).where(UsersTable.is_attached == True).execute()
+    print(query)
+    for user in query:
+        notification = NotificationTable.create(
+            uid=user.tg_id,
+            note_name=name,
+            level=level
+        )
+        print(user.tg_id)
+        if level == "critical" or is_inline:
+            builder = InlineKeyboardBuilder()
+            builder.add(InlineKeyboardButton(text="I've read", callback_data=f"read_{notification.id}"))
+            await bot.send_message(user.tg_id, notification_text, reply_markup=builder.as_markup(),
+                                   parse_mode=ParseMode.MARKDOWN_V2)
+        else:
+            await bot.send_message(user.tg_id, notification_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 @dp.message(Command("gen"))
 async def generate_notification(message: types.Message):
     notification_levels = ["info", "warning", "critical"]
     name = f"Notification_{random.randint(1, 1000)}"
-    text = f"This is a {random.choice(['test', 'sample', 'example'])} notification with ID {random.randint(10000, 99999)}."
+    text = f"This is a {random.choice(['test', 'sample', 'example'])} notification with ID {random.randint(10000, 99999)}"
     level = random.choice(notification_levels)
-    notification = UserNotification.UserNotification(name, text, level, type_=None)
+    is_blur = random.choice([True, False])
+    is_inline = random.choice([True, False])
+    notification = UserNotification.UserNotification(name, text, level, type_=None, is_blur=is_blur, is_inline=is_inline)
+    print("HERE")
     await notification.send()
 
 
 async def main():
-    await load_users_from_db()
+    dp.message.middleware(InnerCallbackQueryUniqueClientMiddleware())
     await dp.start_polling(bot)
-
 
 
 if __name__ == "__main__":

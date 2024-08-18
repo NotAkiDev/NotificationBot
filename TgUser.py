@@ -1,6 +1,5 @@
 import random
 import string
-import peewee
 from dbServing import UsersTable
 
 
@@ -28,20 +27,13 @@ class TgUser:
                 is_attached=self.is_attached,
             )
         else:
-            UsersTable.update(
-                {
-                    UsersTable.confirm_code: self.confirm_code,
-                }
-            ).where(UsersTable.tg_id == self.tg_id).execute()
+            UsersTable.update({UsersTable.confirm_code: self.confirm_code}).where(
+                UsersTable.tg_id == self.tg_id).execute()
 
     # For the deactivation process. Writing the activation code
     def deactivate(self):
         self.__send_deactivate_code()
-        UsersTable.update(
-            {
-                UsersTable.confirm_code: self.confirm_code,
-            }
-        ).where(UsersTable.tg_id == self.tg_id).execute()
+        UsersTable.update({UsersTable.confirm_code: self.confirm_code}).where(UsersTable.tg_id == self.tg_id).execute()
 
     # There should be a status return to the api here.
     def __is_valid_code(self, taken_code):
