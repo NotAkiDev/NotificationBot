@@ -10,7 +10,7 @@ from StateMachine import State
 from dbServing import UsersTable, NotificationTable
 from FeedbackState import FeedbackState
 import UserNotification
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, TelegramObject, message
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, TelegramObject, message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import random
 
@@ -25,7 +25,6 @@ class InnerCallbackQueryUniqueClientMiddleware(BaseMiddleware):
             handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
             event: types.Message,
             data: Dict[str, Any]) -> Any:
-
         user_data = UsersTable.get_or_none(UsersTable.tg_id == event.from_user.id)
         if user_data:
             tg_user = TgUser(
@@ -76,10 +75,8 @@ async def handler_start(message: types.Message, state: FSMContext):
 
 
 @dp.message(StateFilter(State.START), F.text == "Connect Account")
-async def handler_button_activate(message: types.Message, state: FSMContext, data: Dict[str, Any]):
+async def handler_button_activate(message: types.Message, state: FSMContext, data: Dict[Any, int]):
     global users
-    tg_user = data.get("tg_user")
-    print(tg_user)
     user_id = message.from_user.id
     if user_id in users:
         users[user_id][0] = TgUser(
@@ -176,6 +173,7 @@ async def generate_notification(message: types.Message):
 async def main():
     await load_users_from_db()
     await dp.start_polling(bot)
+
 
 
 if __name__ == "__main__":
