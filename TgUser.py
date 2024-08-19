@@ -69,6 +69,9 @@ class TgUser:
             return True
         return False
 
+    def is_attached(self):
+        return self.is_attached
+
     def __send_activate_code(self):
         possible_chars = string.ascii_lowercase + string.digits
         self.confirm_code = ''.join(random.choice(possible_chars) for _ in range(8))
