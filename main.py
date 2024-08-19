@@ -5,7 +5,6 @@ from aiogram.fsm.context import FSMContext
 import asyncio
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
-from config_reader import config
 from TgUser import TgUser
 from StateMachine import State
 from dbServing import UsersTable, NotificationTable
@@ -14,8 +13,10 @@ import UserNotification
 from aiogram.types import InlineKeyboardButton, TelegramObject
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import random
+from dotenv import dotenv_values
 
-bot = Bot(token=config.bot_token.get_secret_value())
+config = dotenv_values(".env")
+bot = Bot(token=config.get("bot_token"))
 dp = Dispatcher()
 
 
@@ -62,7 +63,7 @@ async def handler_start(message: types.Message, state: FSMContext, tg_user: Any)
         await message.answer("Welcome! What would you like to do?", reply_markup=keyboard)
         await state.set_state(State.START)
     else:
-        await message.answer("You're already registered")
+        await message.answer("You're already registered. Use keyboard")
 
 
 @dp.message(StateFilter(None, State.START), F.text == "Connect Account")
@@ -80,12 +81,14 @@ async def handler_button_activate(message: types.Message, state: FSMContext, tg_
         await message.answer("You're registered.")
 
 
-@dp.message(StateFilter(State.WAIT_NOTIFICATION), F.text == "Deactivate Account")
+@dp.message( F.text == "Deactivate Account")
 async def handler_button_deactivate(message: types.Message, state: FSMContext, tg_user):
-    if tg_user:
+    if tg_user.return_attached():
         tg_user.deactivate()
         await message.answer("Enter the deactivation code:")
         await state.set_state(State.GET_CODE)
+    else:
+        await message.answer("You are not activated")
 
 
 @dp.message(StateFilter(State.ON_VALIDATION, State.GET_CODE), lambda message: len(message.text) == 8)

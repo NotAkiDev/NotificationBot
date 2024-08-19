@@ -1,15 +1,17 @@
 from peewee import *
-from config_reader import config
+from dotenv import dotenv_values
 import datetime
 import uuid
 
+config = dotenv_values(".env")
+
 # Database configuration
 db = PostgresqlDatabase(
-    config.db_name.get_secret_value(),
-    user=config.user.get_secret_value(),
-    password=config.passw.get_secret_value(),
-    host=config.host.get_secret_value(),
-    port=config.port.get_secret_value()
+    config.get("db_name"),
+    user=config.get("user"),
+    password=config.get("passw"),
+    host=config.get("host"),
+    port=config.get("port")
 )
 
 
@@ -29,7 +31,6 @@ class UsersTable(BaseModel):
     username = CharField(null=True)  # User's username (optional)
     confirm_code = CharField(null=True)  # Allow null for confirmation code (it can be empty)
     is_attached = BooleanField(default=False)  # Default to False
-
 
     class Meta:
         database = db  # Define the database to use for this model
