@@ -16,19 +16,8 @@ class TgUser:
     def activate(self):
         print(f"Activating user with ID: {self.tg_id}")
         self.__send_activate_code()
-        user_query = UsersTable.select().where(UsersTable.tg_id == self.tg_id)
-        if not user_query.exists():
-            UsersTable.create(
-                tg_id=self.tg_id,
-                name=self.name,
-                surname=self.surname,
-                username=self.username,
-                confirm_code=self.confirm_code,
-                is_attached=self.is_attached,
-            )
-        else:
-            UsersTable.update({UsersTable.confirm_code: self.confirm_code}).where(
-                UsersTable.tg_id == self.tg_id).execute()
+        UsersTable.update({UsersTable.confirm_code: self.confirm_code}).where(
+            UsersTable.tg_id == self.tg_id).execute()
 
     # For the deactivation process. Writing the activation code
     def deactivate(self):
@@ -69,7 +58,7 @@ class TgUser:
             return True
         return False
 
-    def is_attached(self):
+    def return_attached(self):
         return self.is_attached
 
     def __send_activate_code(self):

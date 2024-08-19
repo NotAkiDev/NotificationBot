@@ -68,10 +68,10 @@ async def handler_start(message: types.Message, state: FSMContext, tg_user: Any)
 @dp.message(StateFilter(None, State.START), F.text == "Connect Account")
 async def handler_button_activate(message: types.Message, state: FSMContext, tg_user: TgUser):
     print(await state.get_state())
-    if tg_user.is_attached():
+    if tg_user.return_attached():
         await message.answer("You're already registered or can't be registered now")
 
-    elif tg_user is None:
+    elif tg_user is not None:
         tg_user.activate()
         await message.answer("Enter the activation code:")
         await state.set_state(State.ON_VALIDATION)
@@ -114,7 +114,7 @@ async def code_handler(message: types.Message, state: FSMContext, tg_user):
 async def handle_read_button(callback_query: types.CallbackQuery):
     notification_id = callback_query.data.split("_")[1]
     NotificationTable.update(
-        {NotificationTable.feedback: FeedbackState.CONFIRM}
+        {NotificationTable.feedback: FeedbackState.CONFIRM.name}
     ).where(NotificationTable.id == notification_id).execute()
 
     await bot.answer_callback_query(callback_query.id)
